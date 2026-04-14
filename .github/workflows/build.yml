@@ -1,0 +1,93 @@
+name: Build VocalChopper VST3
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+
+  build-windows:
+    name: Windows VST3
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: VocalChopperVST
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Cache JUCE
+        uses: actions/cache@v4
+        with:
+          path: VocalChopperVST/build/_deps
+          key: juce-windows
+      - name: Configure CMake
+        run: cmake -B build -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release
+        shell: cmd
+      - name: Build
+        run: cmake --build build --config Release --parallel
+        shell: cmd
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: VocalChopper-Windows-VST3
+          path: VocalChopperVST/build/VocalChopper_artefacts/Release/VST3/
+          if-no-files-found: error
+          retention-days: 90
+
+  build-macos:
+    name: macOS VST3
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: VocalChopperVST
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Cache JUCE
+        uses: actions/cache@v4
+        with:
+          path: VocalChopperVST/build/_deps
+          key: juce-macos
+      - name: Configure CMake
+        run: cmake -B build -G Xcode -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
+      - name: Build
+        run: cmake --build build --config Release --parallel
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: VocalChopper-macOS-VST3
+          path: VocalChopperVST/build/VocalChopper_artefacts/Release/VST3/
+          if-no-files-found: error
+          retention-days: 90
+
+  build-linux:
+    name: Linux VST3
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: VocalChopperVST
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y cmake clang libasound2-dev libx11-dev libxinerama-dev libxext-dev libxrandr-dev libxcursor-dev libxcomposite-dev libfreetype-dev libfontconfig1-dev libglu1-mesa-dev libwebkit2gtk-4.0-dev pkg-config
+        working-directory: .
+      - name: Cache JUCE
+        uses: actions/cache@v4
+        with:
+          path: VocalChopperVST/build/_deps
+          key: juce-linux
+      - name: Configure CMake
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
+      - name: Build
+        run: cmake --build build --config Release --parallel
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: VocalChopper-Linux-VST3
+          path: VocalChopperVST/build/VocalChopper_artefacts/Release/VST3/
+          if-no-files-found: error
+          retention-days: 90
