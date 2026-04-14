@@ -1,0 +1,149 @@
+name: Build VocalChopper VST3
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    name: Windows VST3
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Find CMakeLists.txt
+        id: findcmake
+        shell: pwsh
+        run: |
+          $cmake = Get-ChildItem -Recurse -Filter CMakeLists.txt | Where-Object { (Get-Content $_.FullName) -match "juce_add_plugin" } | Select-Object -First 1
+          $dir = $cmake.DirectoryName
+          echo "Project dir: $dir"
+          echo "PROJECT_DIR=$dir" >> $env:GITHUB_OUTPUT
+
+      - name: Cache JUCE
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.findcmake.outputs.PROJECT_DIR }}/build/_deps
+          key: juce-7.0.12-windows-${{ hashFiles('**/CMakeLists.txt') }}
+          restore-keys: juce-7.0.12-windows-
+
+      - name: Configure CMake
+        shell: pwsh
+        run: |
+          cd "${{ steps.findcmake.outputs.PROJECT_DIR }}"
+          cmake -B build -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build Release
+        shell: pwsh
+        run: |
+          cd "${{ steps.findcmake.outputs.PROJECT_DIR }}"
+          cmake --build build --config Release --parallel
+
+      - name: Upload VST3
+        uses: actions/upload-artifact@v4
+        with:
+          name: VocalChopper-Windows-VST3
+          path: ${{ steps.findcmake.outputs.PROJECT_DIR }}/build/VocalChopper_artefacts/Release/VST3/
+          if-no-files-found: error
+          retention-days: 90
+
+  build-macos:
+    name: macOS VST3
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Find project dir
+        id: findcmake
+        run: |
+          DIR=$(find . -name CMakeLists.txt | xargs grep -l "juce_add_plugin" | head -1 | xargs dirname)
+          echo "Project dir: $DIR"
+          echo "PROJECT_DIR=$DIR" >> $GITHUB_OUTPUT
+
+      - name: Cache JUCE
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.findcmake.outputs.PROJECT_DIR }}/build/_deps
+          key: juce-7.0.12-macos-${{ hashFiles('**/CMakeLists.txt') }}
+          restore-keys: juce-7.0.12-macos-
+
+      - name: Configure CMake
+        run: |
+          cd "${{ steps.findcmake.outputs.PROJECT_DIR }}"
+          cmake -B build -G Xcode \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
+
+      - name: Build Release
+        run: |
+          cd "${{ steps.findcmake.outputs.PROJECT_DIR }}"
+          cmake --build build --config Release --parallel
+
+      - name: Upload VST3
+        uses: actions/upload-artifact@v4
+        with:
+          name: VocalChopper-macOS-VST3
+          path: ${{ steps.findcmake.outputs.PROJECT_DIR }}/build/VocalChopper_artefacts/Release/VST3/
+          if-no-files-found: error
+          retention-days: 90
+
+  build-linux:
+    name: Linux VST3
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            cmake clang \
+            libasound2-dev libx11-dev libxinerama-dev \
+            libxext-dev libxrandr-dev libxcursor-dev \
+            libxcomposite-dev libfreetype-dev \
+            libfontconfig1-dev libglu1-mesa-dev \
+            libwebkit2gtk-4.0-dev pkg-config
+
+      - name: Find project dir
+        id: findcmake
+        run: |
+          DIR=$(find . -name CMakeLists.txt | xargs grep -l "juce_add_plugin" | head -1 | xargs dirname)
+          echo "Project dir: $DIR"
+          echo "PROJECT_DIR=$DIR" >> $GITHUB_OUTPUT
+
+      - name: Cache JUCE
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.findcmake.outputs.PROJECT_DIR }}/build/_deps
+          key: juce-7.0.12-linux-${{ hashFiles('**/CMakeLists.txt') }}
+          restore-keys: juce-7.0.12-linux-
+
+      - name: Configure CMake
+        run: |
+          cd "${{ steps.findcmake.outputs.PROJECT_DIR }}"
+          cmake -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER=clang \
+            -DCMAKE_CXX_COMPILER=clang++
+
+      - name: Build Release
+        run: |
+          cd "${{ steps.findcmake.outputs.PROJECT_DIR }}"
+          cmake --build build --config Release --parallel
+
+      - name: Upload VST3
+        uses: actions/upload-artifact@v4
+        with:
+          name: VocalChopper-Linux-VST3
+          path: ${{ steps.findcmake.outputs.PROJECT_DIR }}/build/VocalChopper_artefacts/Release/VST3/
+          if-no-files-found: error
+          retention-days: 90
